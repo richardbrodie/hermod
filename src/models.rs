@@ -21,7 +21,7 @@ pub enum ItemType {
 /////////////
 
 pub struct Feed {
-  pub feed: Channel,
+  pub channel: Channel,
   pub items: Vec<Item>,
 }
 

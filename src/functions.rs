@@ -22,7 +22,7 @@ pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = ()> {
     .and_then(|(new_feed, mut item_type)| Ok((new_feed, consume_item_types(&mut item_type))))
     .and_then(|(feed, items)| {
       Ok(Feed {
-        feed: feed,
+        channel: feed,
         items: items,
       })
     })
@@ -44,7 +44,7 @@ pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = ()> {
 /// Future components ///
 /////////////////////////
 
-pub fn fetch_feed_data(url: &str) -> impl Future<Item = Vec<u8>, Error = ()> {
+fn fetch_feed_data(url: &str) -> impl Future<Item = Vec<u8>, Error = ()> {
   let url = url.to_owned();
   let https = HttpsConnector::new(2).expect("TLS initialization failed");
   let client = Client::builder().build::<_, Body>(https);
