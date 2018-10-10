@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 extern crate atom_syndication;
 extern crate base64;
 extern crate chrono;
@@ -13,18 +13,12 @@ extern crate regex;
 extern crate rss;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
 extern crate serde_json;
 extern crate sha2;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_io;
 extern crate url;
-
-use hyper::rt;
-use std::collections::HashMap;
-use std::env;
-use std::sync::{Arc, Mutex};
 
 pub mod feed;
 pub mod models;
