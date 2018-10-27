@@ -3,7 +3,10 @@ name = "hermod"
 description = "A rust futures-based RSS/Atom library"
 license = "MIT"
 version = "0.1.0"
-authors = ["richard <richard@radagast.nu>"]
+readme = "README.md"
+documentation = "https://docs.rs/hermod"
+repository = "https://github.com/richardbrodie/hermod"
+authors = ["Richard Brodie <richard@radagast.nu>"]
 
 [dependencies]
 atom_syndication = "^0.6"
