@@ -3,6 +3,8 @@ A futures-based RSS-reading library for rust.
 
 ## To use
 
+To fetch a feed
+
 ```rust
 extern crate hermod;
 
@@ -18,13 +20,15 @@ fn get_a_feed(url: &str) {
 }
 ```
 
+To start a loop that will fetch several feeds, and run a custom func for each feed with the resulting `Feed`
+
 ```rust
 extern crate hermod;
 
 use std::sync::{Arc, Mutex};
 
 use hermod::models::Feed;
-use hermod::futures::start_sub;
+use hermod::futures::start_fetch_loop;
 
 fn automatically_fetch_feeds() {
   let interval = 300; // seconds
