@@ -7,7 +7,7 @@ A futures-based RSS-reading library for rust.
 extern crate hermod;
 
 use hermod::models::Feed;
-use hermod::functions::fetch_feed;
+use hermod::futures::fetch_feed;
 
 fn get_a_feed(url: &str) {
   fetch_feed(url)
@@ -15,5 +15,28 @@ fn get_a_feed(url: &str) {
       let channel = feed.channel;
       let title = channel.title;
     });
+}
+```
+
+```rust
+extern crate hermod;
+
+use std::sync::{Arc, Mutex};
+
+use hermod::models::Feed;
+use hermod::futures::start_sub;
+
+fn automatically_fetch_feeds() {
+  let interval = 300; // seconds
+  let feeds = vec![
+    "https://lorem-rss.herokuapp.com/feed".to_owned(),
+    "https://feeds.feedburner.com/cyclingtipsblog/TJog".to_owned(),
+  ];
+  let feed_state = Arc::new(Mutex::new(feeds)); // thread-safe Vec of strings
+  
+  let func = |feed: Feed| println!("updated feed: {}", feed.channel.title); // func to run for each updated feed
+  
+  let work = start_fetch_loop(feed_state, interval, func);
+  tokio::run(work);
 }
 ```

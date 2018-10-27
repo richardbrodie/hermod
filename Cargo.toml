@@ -1,6 +1,6 @@
 [package]
 name = "hermod"
-description = "A futures-based RSS-reading library for rust"
+description = "A futures-based RSS-fetching library for rust"
 version = "0.1.0"
 authors = ["richard <richard@radagast.nu>"]
 
