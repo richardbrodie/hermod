@@ -35,12 +35,13 @@ pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = ()> {
 
 pub fn start_fetch_loop<F: 'static + Send + Sync + Copy + Clone>(
     state: Arc<Mutex<Vec<String>>>,
+    interval: u64,
     mut func: F,
 ) -> impl Future<Item = (), Error = ()>
 where
     F: FnMut(Feed),
 {
-    Interval::new_interval(Duration::from_secs(5))
+    Interval::new_interval(Duration::from_secs(interval))
         .for_each(move |_| {
             let urls = state.lock().unwrap().clone();
             urls.into_iter().for_each(|url| {
