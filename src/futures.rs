@@ -7,6 +7,7 @@ use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use log::{error, debug};
 use rss;
 use std::io::BufReader;
 use std::str;

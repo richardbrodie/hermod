@@ -1,4 +1,5 @@
 use atom_syndication;
+use serde_derive::Serialize;
 use chrono::{DateTime, Utc};
 use rss;
 use std::str;
