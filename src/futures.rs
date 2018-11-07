@@ -1,6 +1,6 @@
 extern crate futures;
 
-use self::futures::future::{err, ok, Future};
+use self::futures::future::{err, ok, result, Future};
 use self::futures::stream::Stream;
 use atom_syndication;
 use hyper::{Body, Client};
@@ -15,23 +15,24 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::timer::Interval;
 
-use super::models::{Channel, Feed, FeedType, Item, ItemType};
+use super::models::{Channel, Error, Feed, FeedType, Item, ItemType};
 
 ////////////////////////
 /// Future sequences ///
 ////////////////////////
 
-pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = ()> {
+pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = Error> {
     fetch_feed_data(&url)
         .and_then(|data| identify_fetched_data(&data))
         .and_then(move |data| consume_feed_data(&data, &url))
-        .and_then(|(new_feed, mut item_type)| ok((new_feed, consume_item_types(&mut item_type))))
-        .and_then(|(feed, items)| {
-            ok(Feed {
-                channel: feed,
-                items: items,
+        .and_then(|(new_feed, mut item_type)| {
+            consume_item_types(&mut item_type).and_then(|items| {
+                ok(Feed {
+                    channel: new_feed,
+                    items: items,
+                })
             })
-        }).map_err(|_| println!("ErrorKind::FetchDataError"))
+        }).map_err(|_| Error::FetchError)
 }
 
 pub fn start_fetch_loop<F: 'static + Send + Sync + Copy + Clone>(
@@ -46,7 +47,9 @@ where
         .for_each(move |_| {
             let urls = state.lock().unwrap().clone();
             urls.into_iter().for_each(|url| {
-                let work = fetch_feed(url).and_then(move |feed| ok(func(feed)));
+                let work = fetch_feed(url)
+                    .and_then(move |feed| ok(func(feed)))
+                    .map_err(|e| error!("error: {:?}", e));
                 tokio::spawn(work);
             });
             ok(())
@@ -57,19 +60,18 @@ where
 /// Future components ///
 /////////////////////////
 
-fn fetch_feed_data(url: &str) -> impl Future<Item = Vec<u8>, Error = ()> {
+fn fetch_feed_data(url: &str) -> impl Future<Item = Vec<u8>, Error = Error> {
     let url = url.to_owned();
     let https = HttpsConnector::new(2).expect("TLS initialization failed");
     let client = Client::builder().build::<_, Body>(https);
     let local = url.to_owned();
     client
         .get(url.parse().unwrap())
-        .map_err(move |err| error!("could not fetch: '{}': {}", url, err))
+        .map_err(move |_err| Error::FetchError)
         .and_then(move |res| {
-            debug!("fetching: '{}'", local);
             res.into_body()
                 .concat2()
-                .map_err(|_err| ())
+                .map_err(|_err| Error::FetchError)
                 .and_then(move |body| {
                     debug!("collected body: {}", local);
                     ok(body.to_vec())
@@ -77,7 +79,7 @@ fn fetch_feed_data(url: &str) -> impl Future<Item = Vec<u8>, Error = ()> {
         })
 }
 
-fn identify_fetched_data(string: &[u8]) -> impl Future<Item = FeedType, Error = ()> {
+fn identify_fetched_data(string: &[u8]) -> impl Future<Item = FeedType, Error = Error> {
     let mut buf = Vec::new();
     let mut reader = Reader::from_str(str::from_utf8(string).unwrap());
     loop {
@@ -87,14 +89,14 @@ fn identify_fetched_data(string: &[u8]) -> impl Future<Item = FeedType, Error = 
                     debug!("found rss");
                     match rss::Channel::read_from(BufReader::new(string)) {
                         Ok(channel) => return ok(FeedType::RSS(channel)),
-                        Err(_) => return err(()),
+                        Err(_) => return err(Error::ParseError),
                     }
                 }
                 b"feed" => {
                     debug!("found atom");
                     match atom_syndication::Feed::read_from(BufReader::new(string)) {
                         Ok(feed) => return ok(FeedType::Atom(feed)),
-                        Err(_) => return err(()),
+                        Err(_) => return err(Error::ParseError),
                     }
                 }
                 _ => (),
@@ -107,7 +109,7 @@ fn identify_fetched_data(string: &[u8]) -> impl Future<Item = FeedType, Error = 
 fn consume_feed_data(
     parsed: &FeedType,
     url: &str,
-) -> impl Future<Item = (Channel, ItemType), Error = ()> {
+) -> impl Future<Item = (Channel, ItemType), Error = Error> {
     match parsed {
         FeedType::RSS(feed) => {
             let new_feed = Channel::from_rss(&feed, url);
@@ -122,27 +124,27 @@ fn consume_feed_data(
     }
 }
 
+fn consume_item_types(parsed: &mut ItemType) -> impl Future<Item = Vec<Item>, Error = Error> {
+    result(match parsed {
+        ItemType::Item(i) => process_items(i),
+        ItemType::Entry(i) => process_entries(i),
+    })
+}
+
 ///////////////////
 /// Synchronous ///
 ///////////////////
 
-fn consume_item_types(parsed: &mut ItemType) -> Vec<Item> {
-    match parsed {
-        ItemType::Item(i) => process_items(i),
-        ItemType::Entry(i) => process_entries(i),
-    }
-}
-
-fn process_items<'a>(feed_items: &mut Vec<rss::Item>) -> Vec<Item> {
-    let items: Vec<Item> = feed_items
+fn process_items<'a>(feed_items: &mut Vec<rss::Item>) -> Result<Vec<Item>, Error> {
+    let items: Result<Vec<Item>, Error> = feed_items
         .iter()
         .map(|item| Item::from_item(item))
         .collect();
     items
 }
 
-fn process_entries<'a>(feed_items: &mut Vec<atom_syndication::Entry>) -> Vec<Item> {
-    let items: Vec<Item> = feed_items
+fn process_entries<'a>(feed_items: &mut Vec<atom_syndication::Entry>) -> Result<Vec<Item>, Error> {
+    let items: Result<Vec<Item>, Error> = feed_items
         .iter()
         .map(|entry| Item::from_entry(entry))
         .collect();

@@ -10,13 +10,18 @@ use std::str;
 
 pub enum FeedType {
     RSS(rss::Channel),
-    Atom(atom_syndication::Feed)
+    Atom(atom_syndication::Feed),
 }
 pub enum ItemType {
     Item(Vec<rss::Item>),
     Entry(Vec<atom_syndication::Entry>),
 }
 
+#[derive(Debug)]
+pub enum Error {
+    FetchError,
+    ParseError,
+}
 /////////////
 // Channel //
 /////////////
@@ -75,19 +80,19 @@ pub struct Item {
     pub updated_at: Option<DateTime<Utc>>,
 }
 impl Item {
-    pub fn from_item(item: &rss::Item) -> Item {
-        Item {
-            guid: item.guid().unwrap().value().to_owned(),
+    pub fn from_item(item: &rss::Item) -> Result<Item, Error> {
+        Ok(Item {
+            guid: item.guid().ok_or(Error::ParseError)?.value().to_owned(),
             title: item.title().expect("no title!").to_owned(),
             link: item.link().expect("no link!").to_owned(),
             summary: item.description().and_then(|s| Some(s.to_owned())),
             content: item.content().and_then(|s| Some(s.to_owned())),
             published_at: item.pub_date().and_then(|d| parse_date(d)),
             updated_at: item.pub_date().and_then(|d| parse_date(d)),
-        }
+        })
     }
-    pub fn from_entry(item: &atom_syndication::Entry) -> Item {
-        Item {
+    pub fn from_entry(item: &atom_syndication::Entry) -> Result<Item, Error> {
+        Ok(Item {
             guid: item.id().to_owned(),
             title: item.title().to_owned(),
             link: item.links()[0].href().to_owned(),
@@ -95,9 +100,9 @@ impl Item {
             content: item
                 .content()
                 .and_then(|o| o.value().and_then(|s| Some(s.to_owned()))),
-                published_at: item.published().and_then(|d| parse_date(d)),
-                updated_at: parse_date(item.updated()),
-        }
+            published_at: item.published().and_then(|d| parse_date(d)),
+            updated_at: parse_date(item.updated()),
+        })
     }
 }
 
