@@ -5,15 +5,16 @@ use self::futures::stream::Stream;
 use atom_syndication;
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
+use log::{debug, error};
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use log::{error, debug};
 use rss;
 use std::io::BufReader;
 use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::timer::Interval;
+use tokio_current_thread::spawn;
+use tokio_timer::Interval;
 
 use super::models::{Channel, Error, Feed, FeedType, Item, ItemType};
 
@@ -32,7 +33,8 @@ pub fn fetch_feed(url: String) -> impl Future<Item = Feed, Error = Error> {
                     items: items,
                 })
             })
-        }).map_err(|_| Error::FetchError)
+        })
+        .map_err(|_| Error::FetchError)
 }
 
 pub fn start_fetch_loop<F: 'static + Send + Sync + Copy + Clone>(
@@ -50,10 +52,11 @@ where
                 let work = fetch_feed(url)
                     .and_then(move |feed| ok(func(feed)))
                     .map_err(|e| error!("error: {:?}", e));
-                tokio::spawn(work);
+                spawn(work);
             });
             ok(())
-        }).map_err(|_| println!("timer error"))
+        })
+        .map_err(|_| println!("timer error"))
 }
 
 /////////////////////////
